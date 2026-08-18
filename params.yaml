@@ -1,0 +1,94 @@
+# ============================================================
+# Reporting Pipeline Parameters
+# ============================================================
+
+# ---- Input directories. The first-order subdir(s) will be considered 'patient(s)'. The presence of VCFs AND/OR CNVkit outputs within these subdirs will decide the behavior of this pipeline. Filenames matter too (there is a syntax to it!) ---------------
+input_dir: ""
+
+# ----------------------- VCF: High-confidence variant filtering ---------------------------
+repetitive_regions_bed: "/fs04/vh83/reference/annotation_databases/variant_annotation/repetitive_regions/repeat_union.bed"
+repetitive_regions_rescue: 0.2
+min_universal_tumour_af: 0.1
+min_universal_normal_af: 0.25
+
+min_germline_tumour_depth: 50
+min_germline_normal_depth: 50
+
+min_strongsomatic_tumour_depth: 46
+min_strongsomatic_normal_depth: 50
+
+min_likelysomatic_tumour_depth: 59
+min_likelysomatic_normal_depth: 50
+
+min_strongloh_tumour_depth: 41
+min_strongloh_normal_depth: 50
+
+min_likelyloh005_tumour_depth: 66
+min_likelyloh005_normal_depth: 50
+
+min_likelyloh095_tumour_depth: 26
+min_likelyloh095_normal_depth: 50
+
+
+# ---- VCF: Annotations----
+
+## --------------------------------- MANE ------------------------
+mane_db_dir: "/fs04/vh83/pipeline_reference/annotations/snpeff_cache/h38/MANE/1.2"
+
+# -------------------------------- ClinVar -----------------------
+clinvar_vcf: "/fs04/vh83/pipeline_reference/annotations/clinvar/20260615/clinvar_20260615.vcf.gz"
+
+# --------------------------- VEP ---------------------------
+vep_cache_dir: "/fs04/vh83/pipeline_reference/annotations/vep_cache/115/RefSeq"
+vep_fasta: "/fs04/vh83/pipeline_reference/genomes/hg38/Homo_sapiens_assembly38.fasta"
+vep_species: "homo_sapiens"
+vep_assembly: "GRCh38"
+vep_version: "115"
+
+# ----- gnomAD -----------------------
+gnomad_vcf: "/fs04/vh83/reference/annotation_databases/variant_annotation/gnomad/af-only-gnomad.hg38.vcf.gz"
+gnomad_info_prefix: "GNOMAD_"
+
+# ----- spliceAI  ----------------------1-
+# UCSC "chr"-prefixed + tabix-indexed copy of the SpliceAI resource. The raw
+# (Ensembl-contig) source silently matches 0 records against "chr"-prefixed sample
+# VCFs - this pre-renamed copy is the one to actually annotate against.
+spliceai_vcf: "/fs04/vh83/reference/annotation_databases/variant_annotation/spliceai/spliceai_scores.masked.snv.hg38.chr.vcf.gz"
+
+# ----- dbNSFP -----------------------
+dbnsfp_db: "/fs04/vh83/reference/annotation_databases/variant_annotation/dbnsfp/dbNSFP5.3.1a_grch38.gz"
+dbnsfp_fields: "REVEL_score,AlphaMissense_score,AlphaMissense_pred,BayesDel_noAF_score,gnomAD4.1_joint_AF,gnomAD4.1_joint_POPMAX_AF"
+
+# ----- Online Databases -----------------------
+oncokb_gene_list: "/fs04/vh83/reference/annotation_databases/variant_annotation/oncokb/cancerGeneList.tsv"
+cosmic_cmc: "/fs04/vh83/reference/annotation_databases/variant_annotation/cosmic/CancerMutationCensus_AllData_v104_GRCh37.tsv.gz"
+cancerhotspots_v1: "/fs04/vh83/reference/annotation_databases/variant_annotation/cancerhotspots/hotspots.xls"
+cancerhotspots_v2: "/fs04/vh83/reference/annotation_databases/variant_annotation/cancerhotspots/hotspots_v2.xls"
+cancerhotspots_v3: "/fs04/vh83/reference/annotation_databases/variant_annotation/cancerhotspots/hotspots_v3.xlsx"
+eviq_germline: "/fs04/vh83/reference/annotation_databases/variant_annotation/eviq/germline_eviq.csv"
+
+# ----- Whitelists ----------------------------
+
+whitelist: "/home/hle1/vh83_scratch2/liem/resources/markers/cns5_whitelist.csv"
+
+# ---- CNV ----
+chrom_arm_bed: "/fs04/scratch2/vh83/liem/projects/reporting_pipeline/refs/chrom_arm.bed"
+cnv_log2_threshold: 0.2  # CNVkit's own default log2 ratio threshold for calling a segment AMP/DEL
+chromosomal_percentage_decision: 0.9
+arm_percentage_decision: 0.9
+
+hotspot_markers: "/fs04/scratch2/vh83/liem/resources/markers/marker.csv"
+
+# ---- PyTMB ----
+pytmb_db_config: "/fs04/vh83/pipeline_reference/annotations/pytmb_settings/snpeff.yml"
+pytmb_var_config: "/fs04/vh83/pipeline_reference/annotations/pytmb_settings/vardict.yml"
+pytmb_capture_bed: "/fs04/vh83/pipeline_reference/panels/Agilent_exomes/SureSelectXTHS2_V8_hg38/S33266436_Padded_namefixed_filtered.bed"
+pytmb_vaf: 0.05
+pytmb_min_depth: 20
+pytmb_min_alt: 2
+pytmb_filter_syn: true
+pytmb_filter_nc: true
+pytmb_filter_lq: true
+
+# ---- Output path ----
+outdir: "results"
