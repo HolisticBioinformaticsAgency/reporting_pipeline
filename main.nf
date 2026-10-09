@@ -1,6 +1,8 @@
 // -------------------- Includes --------------------
 include { VCF_FILTER }              from './modules/vcf_filter.nf'
 include { VCF_ANNOTATE }            from './modules/vcf_annotate.nf'
+include { VCF_ANNOTATE as VCF_ANNOTATE_CGEN } from './modules/vcf_annotate.nf'
+include { CGEN_GATE }               from './modules/cgen_gate.nf'
 include { VCF_PRIORITISE }          from './modules/vcf_prioritise.nf'
 include { WHITELIST }               from './modules/whitelist.nf'
 include { PYTMB }                   from './modules/pytmb.nf'
@@ -174,6 +176,15 @@ workflow {
         ch_oncokb, ch_cosmic, ch_hotspots_v1, ch_hotspots_v2, ch_hotspots_v3, ch_eviq
     )
 
+    // ── CGen branch (2026-10-09): CGen's somatic gate on the full norm VCF, then the same annotation chain on the
+    //    gated calls, for CGenReporter and CGenGx. Paired cases only; the highconf path above is unchanged ──────
+    CGEN_GATE( ch_vcf_in.filter { pid, cid, mode, raw -> mode == 'paired' } )
+    VCF_ANNOTATE_CGEN(
+        CGEN_GATE.out.vcf, ch_mane_db, ch_clinvar,
+        ch_gnomad, ch_dbnsfp, ch_spliceai,
+        ch_oncokb, ch_cosmic, ch_hotspots_v1, ch_hotspots_v2, ch_hotspots_v3, ch_eviq
+    )
+
     // ── Prioritise reportable germline/somatic variants. Somatic list is
     //    marker-gene-restricted and whitelist-rescued (see vcf_prioritise.nf).
     //    The raw (pre-VCF_FILTER) norm VCF rides along too, so a whitelisted
@@ -252,4 +263,18 @@ workflow {
         .join( CREATE_CNVKIT_SCATTER.out.scatter_dir, by: [0, 1] )
 
     ADD_SCATTER_TO_REPORT( ch_final_report_in )
+}
+
+
+// Run summary for the copy-number record and any report built on these outputs (CGen, 2026-10-09):
+// code version, Nextflow version, dates, outcome, command line and every parameter.
+workflow.onComplete {
+    def rev = workflow.commitId ?: "git -C ${projectDir} rev-parse HEAD".execute().text.trim()
+    def dirty = workflow.commitId ? "" : "git -C ${projectDir} status --porcelain".execute().text.trim()
+    def info = [revision: rev, uncommitted_changes: dirty ? true : false, nextflow: nextflow.version.toString(),
+                started: workflow.start.toString(), completed: workflow.complete.toString(), success: workflow.success,
+                command: workflow.commandLine, params: params]
+    file("${params.outdir}/pipeline_info").mkdirs()
+    file("${params.outdir}/pipeline_info/run_info_${workflow.start.format('yyyyMMdd_HHmmss')}.json").text =
+        groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(info))
 }

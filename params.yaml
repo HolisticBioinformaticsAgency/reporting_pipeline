@@ -82,7 +82,9 @@ spliceai_vcf: "/fs04/vh83/reference/annotation_databases/variant_annotation/spli
 
 # ----- dbNSFP -----------------------
 dbnsfp_db: "/fs04/vh83/reference/annotation_databases/variant_annotation/dbnsfp/dbNSFP5.3.1a_grch38.gz"
-dbnsfp_fields: "REVEL_score,AlphaMissense_score,AlphaMissense_pred,BayesDel_noAF_score,gnomAD4.1_joint_AF,gnomAD4.1_joint_POPMAX_AF"
+dbnsfp_fields: "REVEL_score,AlphaMissense_score,AlphaMissense_pred,BayesDel_addAF_score,BayesDel_noAF_score,gnomAD4.1_joint_AF,gnomAD4.1_joint_POPMAX_AF,gnomAD4.1_joint_nhomalt,gnomAD4.1_joint_AFR_AC,gnomAD4.1_joint_AFR_AN,gnomAD4.1_joint_AMI_AC,gnomAD4.1_joint_AMI_AN,gnomAD4.1_joint_AMR_AC,gnomAD4.1_joint_AMR_AN,gnomAD4.1_joint_ASJ_AC,gnomAD4.1_joint_ASJ_AN,gnomAD4.1_joint_EAS_AC,gnomAD4.1_joint_EAS_AN,gnomAD4.1_joint_FIN_AC,gnomAD4.1_joint_FIN_AN,gnomAD4.1_joint_MID_AC,gnomAD4.1_joint_MID_AN,gnomAD4.1_joint_NFE_AC,gnomAD4.1_joint_NFE_AN,gnomAD4.1_joint_SAS_AC,gnomAD4.1_joint_SAS_AN"
+# CGenReporter install, for its somatic gate (scripts/somatic_gate.sh) (CGen, 2026-10-09)
+cgen_reporter_dir: "SET_ON_INSTALL"
 
 # ----- Online Databases -----------------------
 oncokb_gene_list: "/fs04/vh83/reference/annotation_databases/variant_annotation/oncokb/cancerGeneList.tsv"
