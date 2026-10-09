@@ -3,7 +3,33 @@
 # ============================================================
 
 # ---- Input directories. The first-order subdir(s) will be considered 'patient(s)'. The presence of VCFs AND/OR CNVkit outputs within these subdirs will decide the behavior of this pipeline. Filenames matter too (there is a syntax to it!) ---------------
-input_dir: ""
+# NOTE: this run of preprocessing also emits per-sample facets_purity/ (FACETS
+# tumour-purity estimate) and a purity+ploidy-adjusted *purity.ploidy.call.cns -
+# both picked up automatically for the report's "Tumour Purity" section and CNV calls.
+input_dir: "/fs04/scratch2/vh83/liem/projects/preprocessing_pipeline/results_cnvkit_purity_ploidy_sex_261509"
+
+# ----- MARKERS AND WHITELIST FOR THE PROJECT ------------------------------
+hotspot_markers: "/fs04/scratch2/vh83/liem/resources/markers/marker.csv"
+
+# ----- Whitelists ----------------------------
+# Exact-position WHO CNS5 hotspots (CHROM,POS,REF,ALT,GENE,TRANSCRIPT,CDNA,
+# PROTEIN_OR_NAME,CONTEXT) - consumed by the WHITELIST module (BAM ->
+# per-hotspot tumour/normal REF/ALT read counts for the report's
+# supplementary section), not by VCF_PRIORITISE.
+#
+# OPTIONAL: leave blank (or comment out) to skip the WHITELIST step entirely.
+# The report then carries a note in the "WHO CNS5 Hotspot Read Counts" section
+# saying no whitelist was included, instead of the read-count table.
+whitelist: "/fs04/scratch2/vh83/liem/areas/whitelist/whitelist.csv"
+
+# ----- Supplementary: tool/annotation-database versions ----------------------
+# Manually-maintained, shared across the whole cohort - these can't be
+# recovered reliably from filenames or container tags alone (see
+# supplementary.json itself and generate_report.py's load_supplementary()).
+# OPTIONAL: leave blank to render both Supplementary tables as "not provided".
+supplementary_json: "/fs04/scratch2/vh83/liem/projects/reporting_pipeline/supplementary.json"
+
+
 
 # ----------------------- VCF: High-confidence variant filtering ---------------------------
 repetitive_regions_bed: "/fs04/vh83/reference/annotation_databases/variant_annotation/repetitive_regions/repeat_union.bed"
@@ -14,19 +40,19 @@ min_universal_normal_af: 0.25
 min_germline_tumour_depth: 50
 min_germline_normal_depth: 50
 
-min_strongsomatic_tumour_depth: 46
+min_strongsomatic_tumour_depth: 45
 min_strongsomatic_normal_depth: 50
 
-min_likelysomatic_tumour_depth: 59
+min_likelysomatic_tumour_depth: 60
 min_likelysomatic_normal_depth: 50
 
-min_strongloh_tumour_depth: 41
+min_strongloh_tumour_depth: 40
 min_strongloh_normal_depth: 50
 
-min_likelyloh005_tumour_depth: 66
+min_likelyloh005_tumour_depth: 65
 min_likelyloh005_normal_depth: 50
 
-min_likelyloh095_tumour_depth: 26
+min_likelyloh095_tumour_depth: 25
 min_likelyloh095_normal_depth: 50
 
 
@@ -43,7 +69,6 @@ vep_cache_dir: "/fs04/vh83/pipeline_reference/annotations/vep_cache/115/RefSeq"
 vep_fasta: "/fs04/vh83/pipeline_reference/genomes/hg38/Homo_sapiens_assembly38.fasta"
 vep_species: "homo_sapiens"
 vep_assembly: "GRCh38"
-vep_version: "115"
 
 # ----- gnomAD -----------------------
 gnomad_vcf: "/fs04/vh83/reference/annotation_databases/variant_annotation/gnomad/af-only-gnomad.hg38.vcf.gz"
@@ -67,22 +92,32 @@ cancerhotspots_v2: "/fs04/vh83/reference/annotation_databases/variant_annotation
 cancerhotspots_v3: "/fs04/vh83/reference/annotation_databases/variant_annotation/cancerhotspots/hotspots_v3.xlsx"
 eviq_germline: "/fs04/vh83/reference/annotation_databases/variant_annotation/eviq/germline_eviq.csv"
 
-# ----- Whitelists ----------------------------
-
-whitelist: "/home/hle1/vh83_scratch2/liem/resources/markers/cns5_whitelist.csv"
+# ------- Patient metadata -----------------------
+patient_metadata: "/fs04/scratch2/vh83/liem/resources/CGEN/MOLBI_SQL.tsv"
 
 # ---- CNV ----
-chrom_arm_bed: "/fs04/scratch2/vh83/liem/projects/reporting_pipeline/refs/chrom_arm.bed"
-cnv_log2_threshold: 0.2  # CNVkit's own default log2 ratio threshold for calling a segment AMP/DEL
-chromosomal_percentage_decision: 0.9
-arm_percentage_decision: 0.9
+# Chromosome/arm calls are length-based (% of segment length AMP/DEL/CN-LOH),
+# arm-first with promotion to chromosome-level when both arms agree (see
+# bin/generate_report.py). The CNVkit `weight`-column weighted CN is shown
+# alongside each call (rounded to the nearest integer) and drives the
+# multigene/focal-event "interesting segment" comparison.
+chrom_arm_bed: "/fs04/scratch2/vh83/liem/resources/chrom_arm.bed"
+cn_pct_alt_threshold: 90.0  # chromosome/arm %% length AMP/DEL/CN-LOH required to call it
+amp_segment_cn: 3           # CN at or above which a segment counts as amplified
+del_segment_cn: 1           # CN at or below which a segment counts as deleted
 
-hotspot_markers: "/fs04/scratch2/vh83/liem/resources/markers/marker.csv"
+# Absolute-CN scatter plots (bin/cnv_absolute_scatter.py, via
+# CREATE_CNVKIT_SCATTER): fixed y-axis ceiling (0 to this value) - never
+# expanded. A segment whose CN exceeds it is drawn clipped at the ceiling,
+# marked with a triangle, and labelled with its true CN above the plot.
+scatter_y_max: 10
+
+
 
 # ---- PyTMB ----
 pytmb_db_config: "/fs04/vh83/pipeline_reference/annotations/pytmb_settings/snpeff.yml"
 pytmb_var_config: "/fs04/vh83/pipeline_reference/annotations/pytmb_settings/vardict.yml"
-pytmb_capture_bed: "/fs04/vh83/pipeline_reference/panels/Agilent_exomes/SureSelectXTHS2_V8_hg38/S33266436_Padded_namefixed_filtered.bed"
+pytmb_eff_size: 33280000
 pytmb_vaf: 0.05
 pytmb_min_depth: 20
 pytmb_min_alt: 2
@@ -91,4 +126,4 @@ pytmb_filter_nc: true
 pytmb_filter_lq: true
 
 # ---- Output path ----
-outdir: "results"
+outdir: "testrun_ploidy_260916"

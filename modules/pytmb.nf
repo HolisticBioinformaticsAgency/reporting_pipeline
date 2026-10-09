@@ -78,7 +78,7 @@ process RUN_PYTMB {
     else
         pyTMB.py \\
             -i "\${PLAIN_VCF}" \\
-            --bed ${params.pytmb_capture_bed} \\
+            --effGenomeSize ${params.pytmb_eff_size} \\
             --sample "${tumor_label}" \\
             --dbConfig db.yml \\
             --varConfig var.yml \\

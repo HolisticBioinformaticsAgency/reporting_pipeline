@@ -1,5 +1,18 @@
 // Sequential annotation: SnpEff MANE → ClinVar (SnpSift) → VEP → gnomAD →
 // dbNSFP → SpliceAI → OncoKB/COSMIC/cancerhotspots/eviQ
+//
+// Each step's output filename is built by appending its own suffix onto
+// whatever filename came in, so by the end of the chain the file carries its
+// full annotation history, e.g.:
+//   M24087T_M24087N_vardict_norm_hiconf_MANE_clinvar_20260615_VEP_gnomad_dbNSFP_spliceAI_oncorecur.vcf
+// (the "_hiconf" link comes from VCF_FILTER, upstream of this workflow).
+//
+// NOTE: `output:` filename expressions can only reference process INPUT
+// variables (and params/globals) - NOT `def`s created inside `script:`.
+// Those two blocks are evaluated separately; a script:-scoped def is
+// invisible to output:. So the filename expression is written out fully in
+// both places (output: for Nextflow's own bookkeeping, script: for the
+// shell body) rather than computed once and shared.
 
 process SNPEFF {
     tag "${patient_id}:${case_id}"
@@ -10,9 +23,13 @@ process SNPEFF {
     tuple val(patient_id), val(case_id), val(mode), path(vcf), path(mane_db_dir)
 
     output:
-    tuple val(patient_id), val(case_id), val(mode), path("${case_id}_vardict_MANE.vcf"), emit: vcf
+    tuple val(patient_id), val(case_id), val(mode),
+          path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_MANE.vcf"),
+          emit: vcf
 
     script:
+    def base    = vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf = "${base}_MANE.vcf"
     """
     set -euo pipefail
 
@@ -44,7 +61,7 @@ process SNPEFF {
         -dataDir "\$PWD" \\
         -noStats \\
         "GRCh38.mane.1.2.refseq" \\
-        "${case_id}_snpeff_input.vcf" > "${case_id}_vardict_MANE.vcf"
+        "${case_id}_snpeff_input.vcf" > "${out_vcf}"
     """
 }
 
@@ -58,9 +75,14 @@ process CLINVAR {
     tuple val(patient_id), val(case_id), val(mode), path(mane_vcf), path(clinvar_vcf)
 
     output:
-    tuple val(patient_id), val(case_id), val(mode), path("${case_id}_vardict_MANE_*.vcf"), emit: vcf
+    tuple val(patient_id), val(case_id), val(mode),
+          path("${mane_vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_${clinvar_vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}.vcf"),
+          emit: vcf
 
     script:
+    def base      = mane_vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def clin_stem = clinvar_vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf   = "${base}_${clin_stem}.vcf"
     """
     set -euo pipefail
 
@@ -70,21 +92,16 @@ process CLINVAR {
         cp "${mane_vcf}" "clinvar_input.tmp.vcf"
     fi
 
-    clin_stem=\$(basename "${clinvar_vcf}")
-    clin_stem="\${clin_stem%.gz}"
-    clin_stem="\${clin_stem%.vcf}"
-    OUT_VCF="${case_id}_vardict_MANE_\${clin_stem}.vcf"
-
     if [[ "${clinvar_vcf}" == *.gz ]]; then
         gunzip -c "${clinvar_vcf}" > "clinvar_db.tmp.vcf"
     else
         cp "${clinvar_vcf}" "clinvar_db.tmp.vcf"
     fi
-    SnpSift annotate -sorted "clinvar_db.tmp.vcf" "clinvar_input.tmp.vcf" > "\${OUT_VCF}"
+    SnpSift annotate -sorted "clinvar_db.tmp.vcf" "clinvar_input.tmp.vcf" > "${out_vcf}"
 
-    if ! grep -q '^#CHROM' "\${OUT_VCF}"; then
+    if ! grep -q '^#CHROM' "${out_vcf}"; then
         echo "[CLINVAR] ERROR: annotated VCF missing #CHROM header" >&2
-        head -50 "\${OUT_VCF}" >&2
+        head -50 "${out_vcf}" >&2
         exit 1
     fi
     """
@@ -101,14 +118,15 @@ process VEP {
 
     output:
     tuple val(patient_id), val(case_id), val(mode),
-          path("${case_id}_VEP_${params.vep_species}_${params.vep_assembly}_v${params.vep_version}.vcf"),
+          path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_VEP.vcf"),
           emit: vcf
-    path("${case_id}_VEP_${params.vep_species}_${params.vep_assembly}_v${params.vep_version}_stats.txt"),
+    path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_VEP_stats.txt"),
           emit: stats
 
     script:
-    def out_vcf   = "${case_id}_VEP_${params.vep_species}_${params.vep_assembly}_v${params.vep_version}.vcf"
-    def out_stats = "${case_id}_VEP_${params.vep_species}_${params.vep_assembly}_v${params.vep_version}_stats.txt"
+    def base      = vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf   = "${base}_VEP.vcf"
+    def out_stats = "${base}_VEP_stats.txt"
     """
     set -euo pipefail
 
@@ -140,17 +158,38 @@ process GNOMAD {
     tuple val(patient_id), val(case_id), val(mode), path(vcf), path(gnomad_vcf)
 
     output:
-    tuple val(patient_id), val(case_id), val(mode), path("${case_id}_gnomad.vcf"), emit: vcf
+    tuple val(patient_id), val(case_id), val(mode),
+          path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_gnomad.vcf"),
+          emit: vcf
 
     script:
+    def base    = vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf = "${base}_gnomad.vcf"
     """
     set -euo pipefail
 
-    SnpSift annotate -name ${params.gnomad_info_prefix} "${gnomad_vcf}" "${vcf}" > "${case_id}_gnomad.vcf"
+    # SnpSift annotate doesn't auto-decompress a .gz database - passing it
+    # directly makes it read the raw bgzip bytes as VCF text (visible as
+    # "Impropper VCF entry" garbage containing the BGZF block's own "BC"
+    # header marker). Same fix CLINVAR already needed for its own DB.
+    gunzip -c "${gnomad_vcf}" > "gnomad_db.tmp.vcf"
 
-    if ! grep -q '^#CHROM' "${case_id}_gnomad.vcf"; then
+    # gnomAD is ~14.6GB uncompressed. -sorted does NOT avoid building a full
+    # in-memory index - confirmed empirically (DbVcfSorted.open() still calls
+    # VcfIndex.index()/loadIntervals() internally) - kept anyway since both
+    # inputs are genuinely sorted and it's still the right mode; the actual
+    # fix for OOM is heap size. Reproduced a real OutOfMemoryError at the
+    # container's baked-in default -Xmx1g (same class of bug as DBNSFP).
+    # See nextflow.config withName:'GNOMAD' for why 36g/48G is a reasoned
+    # estimate, not an empirically-confirmed minimum.
+    export _JAVA_OPTIONS="-Xmx36g"
+
+    SnpSift annotate -name ${params.gnomad_info_prefix} "gnomad_db.tmp.vcf" "${vcf}" > "${out_vcf}"
+    rm -f "gnomad_db.tmp.vcf"
+
+    if ! grep -q '^#CHROM' "${out_vcf}"; then
         echo "[GNOMAD] ERROR: annotated VCF missing #CHROM header" >&2
-        head -50 "${case_id}_gnomad.vcf" >&2
+        head -50 "${out_vcf}" >&2
         exit 1
     fi
     """
@@ -167,9 +206,13 @@ process DBNSFP {
     tuple path(dbnsfp_db), path(dbnsfp_tbi)
 
     output:
-    tuple val(patient_id), val(case_id), val(mode), path("${case_id}_dbNSFP.vcf"), emit: vcf
+    tuple val(patient_id), val(case_id), val(mode),
+          path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_dbNSFP.vcf"),
+          emit: vcf
 
     script:
+    def base    = vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf = "${base}_dbNSFP.vcf"
     """
     set -euo pipefail
 
@@ -180,7 +223,7 @@ process DBNSFP {
     export _JAVA_OPTIONS="-Xmx12g"
 
     SnpSift dbnsfp -db "${dbnsfp_db}" -f ${params.dbnsfp_fields} \\
-        "${vcf}" > "${case_id}_dbNSFP.vcf.new"
+        "${vcf}" > "${out_vcf}.new"
 
     # SnpSift dbnsfp writes its whole header block a second time at the very
     # end of the output (trailing, spurious duplicate #CHROM line, no data
@@ -189,11 +232,11 @@ process DBNSFP {
     awk '
       seen==0 { print; if (/^#CHROM/) seen=1; next }
       !/^#/ { print }
-    ' "${case_id}_dbNSFP.vcf.new" > "${case_id}_dbNSFP.vcf"
-    rm -f "${case_id}_dbNSFP.vcf.new"
+    ' "${out_vcf}.new" > "${out_vcf}"
+    rm -f "${out_vcf}.new"
 
     IN_COUNT=\$(grep -vc "^#" "${vcf}")
-    OUT_COUNT=\$(grep -vc "^#" "${case_id}_dbNSFP.vcf")
+    OUT_COUNT=\$(grep -vc "^#" "${out_vcf}")
     if [ "\$IN_COUNT" != "\$OUT_COUNT" ]; then
         echo "[DBNSFP] ERROR: variant count changed (\$IN_COUNT -> \$OUT_COUNT) - dbNSFP annotation likely truncated" >&2
         exit 1
@@ -212,9 +255,13 @@ process SPLICEAI {
     tuple path(spliceai_vcf), path(spliceai_tbi)
 
     output:
-    tuple val(patient_id), val(case_id), val(mode), path("${case_id}_spliceAI.vcf"), emit: vcf
+    tuple val(patient_id), val(case_id), val(mode),
+          path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_spliceAI.vcf"),
+          emit: vcf
 
     script:
+    def base    = vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf = "${base}_spliceAI.vcf"
     """
     set -euo pipefail
 
@@ -223,11 +270,11 @@ process SPLICEAI {
 
     bcftools annotate -a "${spliceai_vcf}" -c INFO/SpliceAI \\
         "${case_id}_input.vcf.gz" \\
-        -o "${case_id}_spliceAI.vcf"
+        -o "${out_vcf}"
 
-    if ! grep -q '^#CHROM' "${case_id}_spliceAI.vcf"; then
+    if ! grep -q '^#CHROM' "${out_vcf}"; then
         echo "[SPLICEAI] ERROR: annotated VCF missing #CHROM header" >&2
-        head -50 "${case_id}_spliceAI.vcf" >&2
+        head -50 "${out_vcf}" >&2
         exit 1
     fi
     """
@@ -248,13 +295,17 @@ process ONCOKB_COSMIC_HOTSPOTS_EVIQ {
     path eviq_germline
 
     output:
-    tuple val(patient_id), val(case_id), val(mode), path("${case_id}_oncorecur.vcf"), emit: vcf
+    tuple val(patient_id), val(case_id), val(mode),
+          path("${vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')}_oncorecur.vcf"),
+          emit: vcf
 
     script:
+    def base    = vcf.name.replaceAll(/\.vcf\.gz$|\.vcf$/, '')
+    def out_vcf = "${base}_oncorecur.vcf"
     """
     set -euo pipefail
 
-    /apps/anaconda/2024.02-1/bin/python3 annotate_actionable_somatic_germline.py \\
+    /apps/anaconda/2024.02-1/bin/python3 "${projectDir}/bin/annotate_actionable_somatic_germline.py" \\
         --vcf "${vcf}" \\
         --oncokb-gene-list "${oncokb_gene_list}" \\
         --cosmic-cmc "${cosmic_cmc}" \\
@@ -262,11 +313,11 @@ process ONCOKB_COSMIC_HOTSPOTS_EVIQ {
         --hotspots-v2 "${hotspots_v2}" \\
         --hotspots-v3 "${hotspots_v3}" \\
         --eviq-germline "${eviq_germline}" \\
-        --out "${case_id}_oncorecur.vcf"
+        --out "${out_vcf}"
 
-    if ! grep -q '^#CHROM' "${case_id}_oncorecur.vcf"; then
+    if ! grep -q '^#CHROM' "${out_vcf}"; then
         echo "[ONCOKB_COSMIC_HOTSPOTS_EVIQ] ERROR: annotated VCF missing #CHROM header" >&2
-        head -50 "${case_id}_oncorecur.vcf" >&2
+        head -50 "${out_vcf}" >&2
         exit 1
     fi
     """

@@ -1,39 +1,48 @@
 process GENERATE_REPORT {
     tag "${patient_id}:${case_id}"
     container 'python:3.11-slim'
-    publishDir { "${params.outdir}/${patient_id}/report" }, mode: 'copy'
+    publishDir { "${params.outdir}/${patient_id}/report" }, mode: 'copy', pattern: '*_scatter_manifest.tsv'
 
     input:
-    tuple val(patient_id), val(case_id), path(germline_vcf), path(somatic_vcf), path(cns), path(cnr_genemetrics), path(msi), path(tmb)
+    tuple val(patient_id), val(case_id), path(germline_vcf), path(somatic_vcf), path(hotspot_counts), path(facets_purity), path(facets_ploidy), path(cns), path(msi), path(tmb), path(tumour_hla), path(germline_hla)
     path marker_csv
     path chrom_arm_bed
+    path patient_metadata
+    path whitelist_csv
+    path supplementary_json
 
     output:
-    tuple val(patient_id), val(case_id), path("${patient_id}_report.md"), emit: report
+    tuple val(patient_id), val(case_id), path("${patient_id}_report.draft.md"),      emit: report
+    tuple val(patient_id), val(case_id), path("${patient_id}_scatter_manifest.tsv"), emit: manifest
 
     script:
-    def mane_db_name = params.mane_db_dir  ? new File(params.mane_db_dir  as String).name : ''
-    def clinvar_name = params.clinvar_vcf  ? new File(params.clinvar_vcf  as String).name : ''
+    // hotspot_counts is a placeholder (assets/NO_WHITELIST) when no whitelist
+    // was configured - drop the flag entirely so the report renders the
+    // "no whitelist included" note instead of a table.
+    def hotspot_arg = hotspot_counts.name == 'NO_WHITELIST' ? '' : "--hotspot-counts \"${hotspot_counts}\""
     """
     generate_report.py \\
         --patient-id    "${patient_id}" \\
         --case-id       "${case_id}" \\
         --germline-vcf  "${germline_vcf}" \\
         --somatic-vcf   "${somatic_vcf}" \\
+        ${hotspot_arg} \\
+        --facets-purity   "${facets_purity}" \\
+        --facets-ploidy   "${facets_ploidy}" \\
         --cns             "${cns}" \\
-        --cnr-genemetrics "${cnr_genemetrics}" \\
         --msi             "${msi}" \\
         --tmb           "${tmb}" \\
+        --tumour-hla    "${tumour_hla}" \\
+        --germline-hla  "${germline_hla}" \\
         --markers       "${marker_csv}" \\
         --chrom-arm     "${chrom_arm_bed}" \\
-        --mane-db-name  "${mane_db_name}" \\
-        --clinvar-name  "${clinvar_name}" \\
-        --vep-species   "${params.vep_species}" \\
-        --vep-assembly  "${params.vep_assembly}" \\
-        --vep-version   "${params.vep_version}" \\
-        --chrom-frac-thr ${params.chromosomal_percentage_decision} \\
-        --arm-frac-thr   ${params.arm_percentage_decision} \\
-        --log2-thr       ${params.cnv_log2_threshold} \\
-        --out           "${patient_id}_report.md"
+        --patient-metadata "${patient_metadata}" \\
+        --whitelist     "${whitelist_csv}" \\
+        --supplementary-json "${supplementary_json}" \\
+        --pct-alt-thr    ${params.cn_pct_alt_threshold} \\
+        --amp-seg-cn     ${params.amp_segment_cn} \\
+        --del-seg-cn     ${params.del_segment_cn} \\
+        --out             "${patient_id}_report.draft.md" \\
+        --scatter-manifest "${patient_id}_scatter_manifest.tsv"
     """
 }

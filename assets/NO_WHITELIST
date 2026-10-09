@@ -1,0 +1,3 @@
+Placeholder staged in place of the whitelist hotspot-counts TSV when
+params.whitelist is not set. GENERATE_REPORT detects this filename and
+omits --hotspot-counts so the report renders the "no whitelist" note.

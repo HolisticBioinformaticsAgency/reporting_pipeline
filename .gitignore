@@ -17,3 +17,7 @@
 # Explicitly whitelist the bin folder
 !bin/
 !bin/**
+
+# Explicitly whitelist the assets folder (NO_WHITELIST placeholder etc.)
+!assets/
+!assets/**
