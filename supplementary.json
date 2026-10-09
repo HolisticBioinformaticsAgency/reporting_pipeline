@@ -1,0 +1,30 @@
+{
+  "Tools": {
+    "BWA": "0.7.19",
+    "Samtools": "1.22.1",
+    "HTSlib (bgzip/tabix)": "1.22.1",
+    "Picard": "3.4.0",
+    "FastQC": "0.12.1",
+    "VarDict-java": "1.8.3",
+    "bcftools": "1.23.1",
+    "CNVkit": "0.9.12",
+    "FACETS (cnv_facets)": "0.16.1",
+    "MSIsensor-pro": "1.3.0",
+    "Polysolver": "v4",
+    "MultiQC": "1.31"
+  },
+  "Annotation Databases": {
+    "SnpEff MANE": "1.2",
+    "ClinVar version date": "15/06/2026",
+    "VEP": "v115",
+    "gnomAD": "v2.1",
+    "dbNSFP": "v5.3.1a, 01/01/2026",
+    "SpliceAI": "Genome scores v1.3",
+    "OncoKB": "v7.3, 25/06/2026",
+    "COSMIC CMC": "v104, 19/05/2026",
+    "cancerhotspots v1": "Reported in Bandlamudi et al., 2026",
+    "cancerhotspots v2": "Reported in Chang et al., 2017",
+    "cancerhotspots v3": "Reported in Chang et al., 2016",
+    "eviQ germline": "Version 9, 11/05/2026"
+  }
+}
