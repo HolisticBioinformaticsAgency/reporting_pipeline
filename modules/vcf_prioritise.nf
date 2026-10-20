@@ -15,8 +15,8 @@
 //         never received - see the raw-VCF rescue step near the end of the
 //         script below, or
 //       * (gate B) any of its ANN blocks names a marker gene (col 2 of
-//         params.hotspot_markers) OR it's a COSMIC oncogene
-//         (COSMIC_ONC_TSG contains "oncogene") at COSMIC_CGC_TIER=1,
+//         params.hotspot_markers) OR it's a COSMIC oncogene or TSG
+//         (COSMIC_ONC_TSG contains "oncogene" or "TSG") at COSMIC_CGC_TIER=1,
 //         AND it has a COSMIC CMC significance tier, a cancerhotspots match
 //         (any version), or a putative HIGH/MODERATE-impact ANN consequence
 //         (the ANN regex in CSQ_EVIDENCE below).
@@ -100,8 +100,9 @@
 //
 // COSMIC_ONC_TSG (used in gate B's first clause) is Number=. like
 // CLNSIG/ANN above, so the same BRE gotcha applies:
-// `~"\(^\|,\)oncogene\(,\|$\)"` anchors on the comma-split token, since the
-// tag can be a compound like "oncogene,TSG" or "oncogene,fusion".
+// `~"\(^\|,\)\(oncogene\|TSG\)\(,\|$\)"` anchors on the comma-split token,
+// since the tag can be a compound like "oncogene,TSG" or "oncogene,fusion"
+// or "TSG,fusion" - either role alone is enough to qualify.
 
 process PRIORITISE_FILTER {
     tag "${patient_id}:${case_id}"
@@ -164,7 +165,7 @@ process PRIORITISE_FILTER {
 
     # ---- final somatic list (gate B, first clause): keep a record only if
     #      ANY of its ANN blocks' Gene_Name is a marker gene, OR it is a
-    #      COSMIC oncogene at CGC tier 1, OR it is an exact whitelist
+    #      COSMIC oncogene or TSG at CGC tier 1, OR it is an exact whitelist
     #      CHROM/POS/REF/ALT match (gate A) ----
     #
     #      LOH exclusion (gate B only - never overrides a whitelist match,
@@ -246,7 +247,7 @@ process PRIORITISE_FILTER {
             if (match(\$8, /(^|;)COSMIC_ONC_TSG=[^;]*/)) {
                 o = substr(\$8, RSTART, RLENGTH); sub(/^;?COSMIC_ONC_TSG=/, "", o); onc_tsg = o
             }
-            is_cgc1_oncogene = (tier == "1") && (onc_tsg ~ /(^|,)oncogene(,|\$)/)
+            is_cgc1_rescue = (tier == "1") && (onc_tsg ~ /(^|,)(oncogene|TSG)(,|\$)/)
 
             cmc_tier = ""
             if (match(\$8, /(^|;)COSMIC_MUTATION_SIGNIFICANCE_TIER=[^;]*/)) {
@@ -271,7 +272,7 @@ process PRIORITISE_FILTER {
 
             key = \$1 SUBSEP \$2 SUBSEP \$4 SUBSEP \$5
             is_whitelisted = (key in W)
-            if (is_whitelisted || ((marker_qualifies || is_cgc1_oncogene) && !is_low_loh)) print
+            if (is_whitelisted || ((marker_qualifies || is_cgc1_rescue) && !is_low_loh)) print
         }
     ' somatic.prefilt.vcf > "${case_id}_prioritised_somatic.vcf"
 

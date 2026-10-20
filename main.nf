@@ -9,6 +9,7 @@ include { PYTMB }                   from './modules/pytmb.nf'
 include { GENERATE_REPORT }         from './modules/generate_report.nf'
 include { CREATE_CNVKIT_SCATTER }   from './modules/create_cnvkit_scatter.nf'
 include { ADD_SCATTER_TO_REPORT }   from './modules/add_scatter_to_report.nf'
+include { CGEN_REPORT }             from './modules/cgen_report.nf'
 
 // A paired tumour/normal norm VCF directly under `dir` (T_..N pattern only -
 // excludes normal-only VCFs like a bare "M24017N_vardict_norm.vcf.gz").
@@ -263,18 +264,21 @@ workflow {
         .join( CREATE_CNVKIT_SCATTER.out.scatter_dir, by: [0, 1] )
 
     ADD_SCATTER_TO_REPORT( ch_final_report_in )
-}
 
+    // ── CGenGx final report (2026-10-14, fixed 2026-10-15) - last step. Depends on
+    //    VCF_ANNOTATE_CGEN.out.vcf (not ADD_SCATTER_TO_REPORT.out.report - see
+    //    cgen_report.nf's own note) purely to force ordering: only once this channel
+    //    emits is this patient's reportable spliceai VCF guaranteed published to
+    //    params.outdir, which is what CGEN_REPORT's script actually reads from ──────
+    CGEN_REPORT(
+        VCF_ANNOTATE_CGEN.out.vcf,
+        channel.value( file(params.cgen_metadata) ),
+        channel.value( file(params.cgen_run_config) )
+    )
+}
 
 // Run summary for the copy-number record and any report built on these outputs (CGen, 2026-10-09):
-// code version, Nextflow version, dates, outcome, command line and every parameter.
-workflow.onComplete {
-    def rev = workflow.commitId ?: "git -C ${projectDir} rev-parse HEAD".execute().text.trim()
-    def dirty = workflow.commitId ? "" : "git -C ${projectDir} status --porcelain".execute().text.trim()
-    def info = [revision: rev, uncommitted_changes: dirty ? true : false, nextflow: nextflow.version.toString(),
-                started: workflow.start.toString(), completed: workflow.complete.toString(), success: workflow.success,
-                command: workflow.commandLine, params: params]
-    file("${params.outdir}/pipeline_info").mkdirs()
-    file("${params.outdir}/pipeline_info/run_info_${workflow.start.format('yyyyMMdd_HHmmss')}.json").text =
-        groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(info))
-}
+// moved into nextflow.config's workflow.onComplete (2026-10-12 fix) - on this Nextflow
+// version a top-level workflow.onComplete {} here no longer parses ("Statements cannot
+// be mixed with script declarations"); nextflow.config has its own, separately-supported
+// workflow.onComplete hook, so the logic lives there instead. See nextflow.config.

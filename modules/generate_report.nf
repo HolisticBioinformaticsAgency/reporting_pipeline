@@ -1,6 +1,6 @@
 process GENERATE_REPORT {
     tag "${patient_id}:${case_id}"
-    container 'python:3.11-slim'
+    container 'quay.io/biocontainers/multiqc:1.31--pyhdfd78af_0'
     publishDir { "${params.outdir}/${patient_id}/report" }, mode: 'copy', pattern: '*_scatter_manifest.tsv'
 
     input:
