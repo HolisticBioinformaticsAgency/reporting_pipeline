@@ -83,15 +83,17 @@ spliceai_vcf: "/fs04/vh83/reference/annotation_databases/variant_annotation/spli
 # ----- dbNSFP -----------------------
 dbnsfp_db: "/fs04/vh83/reference/annotation_databases/variant_annotation/dbnsfp/dbNSFP5.3.1a_grch38.gz"
 dbnsfp_fields: "REVEL_score,AlphaMissense_score,AlphaMissense_pred,BayesDel_addAF_score,BayesDel_noAF_score,gnomAD4.1_joint_AF,gnomAD4.1_joint_POPMAX_AF,gnomAD4.1_joint_nhomalt,gnomAD4.1_joint_AFR_AC,gnomAD4.1_joint_AFR_AN,gnomAD4.1_joint_AMI_AC,gnomAD4.1_joint_AMI_AN,gnomAD4.1_joint_AMR_AC,gnomAD4.1_joint_AMR_AN,gnomAD4.1_joint_ASJ_AC,gnomAD4.1_joint_ASJ_AN,gnomAD4.1_joint_EAS_AC,gnomAD4.1_joint_EAS_AN,gnomAD4.1_joint_FIN_AC,gnomAD4.1_joint_FIN_AN,gnomAD4.1_joint_MID_AC,gnomAD4.1_joint_MID_AN,gnomAD4.1_joint_NFE_AC,gnomAD4.1_joint_NFE_AN,gnomAD4.1_joint_SAS_AC,gnomAD4.1_joint_SAS_AN"
-# CGenReporter install, for its somatic gate (scripts/somatic_gate.sh) (CGen, 2026-10-09)
-cgen_reporter_dir: "/fs04/vh83/local_software/cgen_tools/CGenReporter"
+# CGen tools: the cgen-tools repository (CGenCurator + CGenGx) and the Python environment the jobs use.
+# Where everything sits: cgen-tools/CGenCurator/docs/INSTALL_M3.md (CGen, 2026-10-20)
+cgen_tools_dir: "/fs04/vh83/local_software/cgen_tools/cgen-tools"
+cgen_python: "/fs04/vh83/local_software/cgen_tools/conda_env/bin/python3"
 
 # ---- CGEN_REPORT (CGenGx final report, 2026-10-14) ----
 # metadata schema here is cohort_run.py's own (tumour_sample/normal_sample/patient_id/
 # oncotree_code/...) - NOT the same file as patient_metadata above (that one's for
 # GENERATE_REPORT's display table only, missing the columns cohort_run.py needs).
 cgen_metadata: "/fs04/scratch2/vh83/liem/projects/reporting_pipeline/metadata_20261009.tsv"
-cgen_run_config: "/fs04/vh83/local_software/cgen_tools/CGenReporter/config/run_config_m3.json"
+cgen_run_config: "/fs04/vh83/local_software/cgen_tools/cgen-tools/CGenCurator/config/run_config_m3.json"
 # No default - an OncoKB academic-licence bearer token. Must be supplied per run
 # (--oncokb_api_token on the command line), never committed here.
 oncokb_api_token: null

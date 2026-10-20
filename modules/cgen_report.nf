@@ -1,13 +1,18 @@
 // CGen final reports (2026-10-14, both HTMLs added 2026-10-18): the last step in the
-// pipeline. Runs CGen's own cohort_run.py chain (gate + TMB, then CGenReporter
+// pipeline. Runs CGen's own cohort_run.py chain (gate + TMB, then CGenCurator
 // ingest/annotate/classify/match/report, then CGenGx) and publishes both HTML reports -
-// CGenGx's (the canonical, clinician-facing molecular record) and CGenReporter's (the
+// CGenGx's (the canonical, clinician-facing molecular record) and CGenCurator's (the
 // full variant-by-variant classification detail; see CGenGx/README.md: "a molecular
-// record, not a variant list; the full variant table stays in the CGenReporter report").
+// record, not a variant list; the full variant table stays in the CGenCurator report").
 // No PDF: neither tool writes one from this cohort_run.py call. No container:
-// /fs04/vh83/local_software/cgen_tools/conda_env is a real, already-built conda env on
-// the shared filesystem, called by absolute path directly, same recipe already proven by
-// hand via sbatch.
+// params.cgen_python is a real, already-built conda env on the shared filesystem,
+// called by absolute path directly, same recipe already proven by hand via sbatch.
+//
+// 2026-10-20 (CGen): the case's full run now goes to <outdir>/<patient>/cgen_run/ and is
+// kept on M3 (cohort collect and the diagnostic-report comparison read it); before, it was
+// written to the task's scratch folder and discarded. Tools come from the cgen-tools
+// repository (CGenCurator, renamed from CGenReporter 2026-10-17). Layout:
+// cgen-tools/CGenCurator/docs/INSTALL_M3.md.
 process CGEN_REPORT {
     tag "${patient_id}:${case_id}"
     beforeScript 'module load singularity; module load R/4.4.0-mkl; module load samtools/1.19.3'
@@ -31,35 +36,40 @@ process CGEN_REPORT {
     output:
     tuple val(patient_id), val(case_id),
           path("${patient_id}_CGenGx_report.html"),
-          path("${patient_id}_CGenReporter_report.html"), emit: html
+          path("${patient_id}_CGenCurator_report.html"),
+          path("${patient_id}_cgengx_results.json"), emit: html
 
     script:
+    def tools = params.cgen_tools_dir
+    // params.outdir is resolved relative to the launch dir, not this task's own scratch
+    // cwd - file() resolves it to an absolute path, as the rest of main.nf already does.
+    // --out must be absolute: cohort_run.py stores absolute input paths in case.json
+    // (confirmed 2026-10-14, FileNotFoundError: .../M24087/M24087/CGenReporter/classified_*.json).
+    def results = file(params.outdir)
     """
+    set -euo pipefail
     export PATH="/fs04/vh83/local_software/cgen_tools/bcftools_bin:\$PATH"
     export APPTAINER_BINDPATH=/fs04
-    export CGEN_REF_MANIFEST=/fs04/vh83/local_software/cgen_tools/CGenReporter/config/references_manifest_m3.yaml
+    export CGEN_REF_MANIFEST="${tools}/CGenCurator/config/references_manifest_m3.yaml"
     export ONCOKB_API_TOKEN="${params.oncokb_api_token}"
 
-    # params.input_dir/outdir are resolved relative to the launch dir, not this
-    # task's own scratch cwd - file() here resolves them to absolute paths, same
-    # as how the rest of main.nf already reads params.input_dir.
-    #
-    # --out must be absolute, not "." - cohort_run.py stores case.json's
-    # inputs.reporter_classified as str(out/case_id/.../classified_*.json); when
-    # out is relative that string starts with the case_id again, and cgengx's own
-    # (case_dir / that_string).resolve() then doubles the case_id segment
-    # (case_dir is already absolute by the time cgengx resolves it) - confirmed
-    # 2026-10-14 (FileNotFoundError: .../M24087/M24087/CGenReporter/classified_*.json).
-    /fs04/vh83/local_software/cgen_tools/conda_env/bin/python3 -m cgen_reporter.cli cohort run \\
+    # stop at once if the install is not where INSTALL_M3.md says, rather than run on another copy
+    "${params.cgen_python}" -c "import sys, cgen_curator; f = cgen_curator.__file__; sys.exit(0 if f.startswith('${tools}/CGenCurator/') else 'cgen_curator is installed from ' + f + ', not ${tools}/CGenCurator (see CGenCurator/docs/INSTALL_M3.md)')"
+    test -f "${tools}/CGenGx/cgengx/__init__.py" || { echo "CGenGx not found at ${tools}/CGenGx (see CGenCurator/docs/INSTALL_M3.md)" >&2; exit 1; }
+
+    "${params.cgen_python}" -m cgen_curator.cli cohort run \\
         --metadata "${metadata_tsv}" \\
         --case "${patient_id}" \\
         --preprocessing "${file(params.input_dir)}" \\
-        --reporting "${file(params.outdir)}" \\
-        --out "\$PWD" \\
+        --reporting "${results}" \\
+        --out "${results}" --case-subfolder cgen_run \\
         --config "${run_config_json}" \\
         --force
 
-    cp "${patient_id}"/CGenGx/"${patient_id}"_cgengx_report_*.html "${patient_id}_CGenGx_report.html"
-    cp "${patient_id}"/CGenReporter/"${patient_id}"_Comprehensive_Variant_Classification_Report_*.html "${patient_id}_CGenReporter_report.html"
+    # the kept folder holds every run's dated files, so take the newest of each
+    run="${results}/${patient_id}/cgen_run"
+    cp "\$(ls -t "\$run"/CGenGx/${patient_id}_cgengx_report_*.html | head -1)" "${patient_id}_CGenGx_report.html"
+    cp "\$(ls -t "\$run"/CGenCurator/${patient_id}_Comprehensive_Variant_Classification_Report_*.html | head -1)" "${patient_id}_CGenCurator_report.html"
+    cp "\$(ls -t "\$run"/CGenGx/${patient_id}_cgengx_results_*.json | head -1)" "${patient_id}_cgengx_results.json"
     """
 }

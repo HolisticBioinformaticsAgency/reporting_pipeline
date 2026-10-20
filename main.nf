@@ -10,6 +10,7 @@ include { GENERATE_REPORT }         from './modules/generate_report.nf'
 include { CREATE_CNVKIT_SCATTER }   from './modules/create_cnvkit_scatter.nf'
 include { ADD_SCATTER_TO_REPORT }   from './modules/add_scatter_to_report.nf'
 include { CGEN_REPORT }             from './modules/cgen_report.nf'
+include { CGEN_CACHE_MERGE }        from './modules/cgen_cache_merge.nf'
 
 // A paired tumour/normal norm VCF directly under `dir` (T_..N pattern only -
 // excludes normal-only VCFs like a bare "M24017N_vardict_norm.vcf.gz").
@@ -275,6 +276,9 @@ workflow {
         channel.value( file(params.cgen_metadata) ),
         channel.value( file(params.cgen_run_config) )
     )
+
+    // ── once every case has finished: fold the cases' OncoKB cache copies back (CGen, 2026-10-20) ──
+    CGEN_CACHE_MERGE( CGEN_REPORT.out.html.map { pid, _cid, _gx, _rep, _res -> pid }.collect() )
 }
 
 // Run summary for the copy-number record and any report built on these outputs (CGen, 2026-10-09):

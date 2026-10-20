@@ -1,6 +1,6 @@
 /*
  * CGen's standard somatic gate (recipe A0-A9 + germline arm) on the full paired VarDict norm VCF, before annotation,
- * so the CGen branch annotates the same call set as CGen's local runs. Script lives in the CGenReporter install.
+ * so the CGen branch annotates the same call set as CGen's local runs. Script lives in the cgen-tools install (CGenCurator).
  */
 process CGEN_GATE {
     tag "${patient_id}:${case_id}"
@@ -18,6 +18,6 @@ process CGEN_GATE {
     def (t, n) = case_id.split('_')
     """
     set -euo pipefail
-    bash ${params.cgen_reporter_dir}/scripts/somatic_gate.sh "${vcf}" "${t}_reportable.vcf.gz" "${t}" "${n}"
+    bash ${params.cgen_tools_dir}/CGenCurator/scripts/somatic_gate.sh "${vcf}" "${t}_reportable.vcf.gz" "${t}" "${n}"
     """
 }
