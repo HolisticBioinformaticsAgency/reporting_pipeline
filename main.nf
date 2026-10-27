@@ -1,12 +1,16 @@
 // -------------------- Includes --------------------
 include { VCF_FILTER }              from './modules/vcf_filter.nf'
 include { VCF_ANNOTATE }            from './modules/vcf_annotate.nf'
+include { VCF_ANNOTATE as VCF_ANNOTATE_CGEN } from './modules/vcf_annotate.nf'
+include { CGEN_GATE }               from './modules/cgen_gate.nf'
 include { VCF_PRIORITISE }          from './modules/vcf_prioritise.nf'
 include { WHITELIST }               from './modules/whitelist.nf'
 include { PYTMB }                   from './modules/pytmb.nf'
 include { GENERATE_REPORT }         from './modules/generate_report.nf'
 include { CREATE_CNVKIT_SCATTER }   from './modules/create_cnvkit_scatter.nf'
 include { ADD_SCATTER_TO_REPORT }   from './modules/add_scatter_to_report.nf'
+include { CGEN_REPORT }             from './modules/cgen_report.nf'
+include { CGEN_CACHE_MERGE }        from './modules/cgen_cache_merge.nf'
 
 // A paired tumour/normal norm VCF directly under `dir` (T_..N pattern only -
 // excludes normal-only VCFs like a bare "M24017N_vardict_norm.vcf.gz").
@@ -174,6 +178,15 @@ workflow {
         ch_oncokb, ch_cosmic, ch_hotspots_v1, ch_hotspots_v2, ch_hotspots_v3, ch_eviq
     )
 
+    // ── CGen branch (2026-10-09): CGen's somatic gate on the full norm VCF, then the same annotation chain on the
+    //    gated calls, for CGenReporter and CGenGx. Paired cases only; the highconf path above is unchanged ──────
+    CGEN_GATE( ch_vcf_in.filter { pid, cid, mode, raw -> mode == 'paired' } )
+    VCF_ANNOTATE_CGEN(
+        CGEN_GATE.out.vcf, ch_mane_db, ch_clinvar,
+        ch_gnomad, ch_dbnsfp, ch_spliceai,
+        ch_oncokb, ch_cosmic, ch_hotspots_v1, ch_hotspots_v2, ch_hotspots_v3, ch_eviq
+    )
+
     // ── Prioritise reportable germline/somatic variants. Somatic list is
     //    marker-gene-restricted and whitelist-rescued (see vcf_prioritise.nf).
     //    The raw (pre-VCF_FILTER) norm VCF rides along too, so a whitelisted
@@ -252,4 +265,24 @@ workflow {
         .join( CREATE_CNVKIT_SCATTER.out.scatter_dir, by: [0, 1] )
 
     ADD_SCATTER_TO_REPORT( ch_final_report_in )
+
+    // ── CGenGx final report (2026-10-14, fixed 2026-10-15) - last step. Depends on
+    //    VCF_ANNOTATE_CGEN.out.vcf (not ADD_SCATTER_TO_REPORT.out.report - see
+    //    cgen_report.nf's own note) purely to force ordering: only once this channel
+    //    emits is this patient's reportable spliceai VCF guaranteed published to
+    //    params.outdir, which is what CGEN_REPORT's script actually reads from ──────
+    CGEN_REPORT(
+        VCF_ANNOTATE_CGEN.out.vcf,
+        channel.value( file(params.cgen_metadata) ),
+        channel.value( file(params.cgen_run_config) )
+    )
+
+    // ── once every case has finished: fold the cases' OncoKB cache copies back (CGen, 2026-10-20) ──
+    CGEN_CACHE_MERGE( CGEN_REPORT.out.html.map { pid, _cid, _gx, _rep, _res -> pid }.collect() )
 }
+
+// Run summary for the copy-number record and any report built on these outputs (CGen, 2026-10-09):
+// moved into nextflow.config's workflow.onComplete (2026-10-12 fix) - on this Nextflow
+// version a top-level workflow.onComplete {} here no longer parses ("Statements cannot
+// be mixed with script declarations"); nextflow.config has its own, separately-supported
+// workflow.onComplete hook, so the logic lives there instead. See nextflow.config.
