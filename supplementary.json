@@ -11,10 +11,12 @@
     "FACETS (cnv_facets)": "0.16.1",
     "MSIsensor-pro": "1.3.0",
     "Polysolver": "v4",
-    "MultiQC": "1.31"
+    "MultiQC": "1.31",
+    "SnpEff": "5.2",
+    "pyTMB": "1.5.0"
   },
   "Annotation Databases": {
-    "SnpEff MANE": "1.2",
+    "MANE": "1.2",
     "ClinVar version date": "15/06/2026",
     "VEP": "v115",
     "gnomAD": "v2.1",
